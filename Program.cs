@@ -26,6 +26,8 @@ namespace ServerFileBackup
         /// <exception cref="ArgumentException"></exception>
         public static void Main(string[] args)
         {
+            var now = DateTime.Now;
+
             if (args.Length < 2 || args.Length % 2 != 0 ||
                 args.Select((x, i) => new { Value = x, Index = i }).Any(x =>
                 {
@@ -50,11 +52,10 @@ namespace ServerFileBackup
                 var folder = args[i];
                 var maxBk = int.Parse(args[i + 1]);
 
-                var nowDate = int.Parse(DateTime.Now.ToString("yyyyMMdd"));
-                var nowDateFolder = $@"{folder}\d.{nowDate}{FOLDER_BK_NM}";
-                var nowTime = int.Parse(DateTime.Now.ToString("HHmmss"));
-                var nowTimeFolder = $@"{nowDateFolder}\t.{nowTime}{FOLDER_BK_NM}";
-                var bkLimit = nowDate - maxBk;
+                var nowDateInt = int.Parse(now.ToString("yyyyMMdd"));
+                var nowDateFolder = $@"{folder}\d.{now:yyyyMMdd}{FOLDER_BK_NM}";
+                var nowTimeFolder = $@"{nowDateFolder}\t.{now:HHmmss}{FOLDER_BK_NM}";
+                var bkLimit = nowDateInt - maxBk;
 
                 CopyEntireDirectory(folder, nowDateFolder, ignoredFormats);
                 CopyEntireDirectory(folder, nowTimeFolder, ignoredFormats);
