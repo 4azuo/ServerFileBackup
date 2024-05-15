@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -11,9 +10,13 @@ namespace ServerFileBackup
     public class Program
     {
         private const string FOLDER_BK_NM = ".svf.bk";
-        private const string IGNORED_FOLDER_BK_D = "d\\.\\d{8}" + FOLDER_BK_NM;
-        private const string IGNORED_FOLDER_BK_T = "t\\.\\d{6}" + FOLDER_BK_NM;
         private const string IGNORE_FILE = "/.svf.bk.ignore";
+
+        private const string IGNOREREGEX_FOLDER_BK_D = "d\\.\\d{8}" + FOLDER_BK_NM;
+        private const string IGNOREREGEX_FOLDER_BK_T = "t\\.\\d{6}" + FOLDER_BK_NM;
+        private const string IGNOREREGEX_IGNORE_FILE = "\\.svf\\.bk\\.ignore";
+
+        private static IList<string> IgnoredFormats { get; set; }
 
         /// <summary>
         /// Backup folder's files to [.svf.bk] folder.
@@ -43,9 +46,10 @@ namespace ServerFileBackup
                 throw new ArgumentException();
             }
 
-            var ignoredFormats = (File.Exists(IGNORE_FILE) ? File.ReadAllLines(IGNORE_FILE) : new string[0]).ToList();
-            ignoredFormats.Add(IGNORED_FOLDER_BK_D);
-            ignoredFormats.Add(IGNORED_FOLDER_BK_T);
+            IgnoredFormats = (File.Exists(IGNORE_FILE) ? File.ReadAllLines(IGNORE_FILE) : new string[0]).ToList();
+            IgnoredFormats.Add(IGNOREREGEX_FOLDER_BK_D);
+            IgnoredFormats.Add(IGNOREREGEX_FOLDER_BK_T);
+            IgnoredFormats.Add(IGNOREREGEX_IGNORE_FILE);
 
             for (int i = 0; i < args.Length; i += 2)
             {
@@ -57,8 +61,8 @@ namespace ServerFileBackup
                 var nowTimeFolder = $@"{nowDateFolder}\t.{now:HHmmss}{FOLDER_BK_NM}";
                 var bkLimit = nowDateInt - maxBk;
 
-                CopyEntireDirectory(folder, nowDateFolder, ignoredFormats);
-                CopyEntireDirectory(folder, nowTimeFolder, ignoredFormats);
+                CopyEntireDirectory(folder, nowDateFolder);
+                CopyEntireDirectory(folder, nowTimeFolder);
 
                 foreach (var dir in Directory.GetDirectories(folder, $"d.*{FOLDER_BK_NM}", SearchOption.TopDirectoryOnly))
                 {
@@ -69,29 +73,34 @@ namespace ServerFileBackup
             }
         }
 
-        public static void CopyEntireDirectory(string source, string target, List<string> ignoredFormats, bool overwiteFiles = true)
+        public static void CopyEntireDirectory(string source, string target, bool overwiteFiles = true)
         {
-            CopyEntireDirectory(new DirectoryInfo(source), new DirectoryInfo(target), ignoredFormats, overwiteFiles);
+            CopyEntireDirectory(new DirectoryInfo(source), new DirectoryInfo(target), overwiteFiles);
         }
 
-        public static void CopyEntireDirectory(DirectoryInfo source, DirectoryInfo target, List<string> ignoredFormats, bool overwiteFiles = true)
+        public static void CopyEntireDirectory(DirectoryInfo source, DirectoryInfo target, bool overwiteFiles = true)
         {
             if (!source.Exists) return;
             if (!target.Exists) target.Create();
 
             Parallel.ForEach(source.GetDirectories(), (sourceChildDirectory) =>
             {
-                if (ignoredFormats.Any(x => Regex.IsMatch(sourceChildDirectory.Name, x)))
+                if (IsIgnoredFormat(sourceChildDirectory.Name))
                     return;
-                CopyEntireDirectory(sourceChildDirectory, new DirectoryInfo(Path.Combine(target.FullName, sourceChildDirectory.Name)), ignoredFormats, overwiteFiles);
+                CopyEntireDirectory(sourceChildDirectory, new DirectoryInfo(Path.Combine(target.FullName, sourceChildDirectory.Name)), overwiteFiles);
             });
 
             Parallel.ForEach(source.GetFiles(), sourceFile =>
             {
-                if (ignoredFormats.Any(x => Regex.IsMatch(sourceFile.Name, x)))
+                if (IsIgnoredFormat(sourceFile.Name))
                     return;
                 sourceFile.CopyTo(Path.Combine(target.FullName, sourceFile.Name), overwiteFiles);
             });
+        }
+
+        public static bool IsIgnoredFormat(string format)
+        {
+            return IgnoredFormats.Any(x => Regex.IsMatch(format, x)) || Environment.GetCommandLineArgs()[0] == format;
         }
     }
 }
